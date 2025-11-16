@@ -72,7 +72,33 @@ cat_values = {
 
 # Title / description
 st.title("🌦️ Aussie Rain Predictor")
-st.caption("Numeric: min–max sliders • Categorical: dropdown lists • Full preprocessing pipeline")
+st.caption(
+    "This application predicts whether it will rain tomorrow in Australia "
+    "based on daily weather observations from the Australian Bureau of Meteorology."
+)
+
+with st.expander("📘 Feature Description (What Each Parameter Means)"):
+    st.markdown("""
+**Numeric Features**
+- **MinTemp / MaxTemp** — Minimum and maximum temperature of the day (°C).
+- **Rainfall** — Total rainfall measured (mm).
+- **Evaporation** — Amount of water evaporated (mm).
+- **Sunshine** — Hours of bright sunshine.
+- **WindGustSpeed / WindSpeed9am / WindSpeed3pm** — Wind speeds (km/h).
+- **Humidity9am / Humidity3pm** — Relative humidity (%).
+- **Pressure9am / Pressure3pm** — Atmospheric pressure (hPa).
+- **Cloud9am / Cloud3pm** — Cloud coverage (0–9 scale).
+- **Temp9am / Temp3pm** — Temperature at 9am / 3pm (°C).
+
+**Categorical Features**
+- **Location** — Weather station location in Australia.
+- **WindGustDir** — Direction of the strongest wind gust.
+- **WindDir9am / WindDir3pm** — Wind direction at 9am / 3pm.
+- **RainToday** — Whether it rained today ("Yes" / "No").
+
+_All features come from the official WeatherAUS dataset._
+    """)
+
 
 # Randomization & Reset logic using Streamlit session_state
 if "inputs_initialized" not in st.session_state:
@@ -207,4 +233,5 @@ if st.button("🔮 Predict RainTomorrow"):
     except Exception as e:
         st.error("Error during preprocessing or model prediction.")
         st.exception(e)
+
 
