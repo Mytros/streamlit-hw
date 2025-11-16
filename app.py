@@ -108,7 +108,7 @@ _All features come from the official WeatherAUS dataset._
     """)
 
 # -----------------------------------------------------------------------------
-# Initialize session_state for inputs
+# Initialize session_state for inputs (only once)
 # -----------------------------------------------------------------------------
 if "inputs_initialized" not in st.session_state:
     st.session_state.inputs_initialized = True
@@ -125,46 +125,7 @@ if "inputs_initialized" not in st.session_state:
         st.session_state[col] = default_value
 
 # -----------------------------------------------------------------------------
-# Input Form
-# -----------------------------------------------------------------------------
-st.header("Input Weather Data")
-
-col_left, col_right = st.columns(2)
-
-numeric_inputs = {}
-for i, col in enumerate(NUM):
-    min_val, max_val, _ = num_stats[col]
-    step = (max_val - min_val) / 100 if max_val > min_val else 0.1
-
-    with (col_left if i % 2 == 0 else col_right):
-        numeric_inputs[col] = st.slider(
-            label=col,
-            min_value=min_val,
-            max_value=max_val,
-            value=st.session_state[col],
-            step=step,
-            key=col  # each feature uses its own key in session_state
-        )
-
-categorical_inputs = {}
-for i, col in enumerate(CAT):
-    options = [str(o) for o in cat_values[col]]
-
-    # Current value stored in session_state[col]
-    current_value = str(st.session_state[col])
-    # Fallback in case current_value is not found in options
-    index = options.index(current_value) if current_value in options else 0
-
-    with (col_left if i % 2 == 0 else col_right):
-        categorical_inputs[col] = st.selectbox(
-            label=col,
-            options=options,
-            index=index,
-            key=col
-        )
-
-# -----------------------------------------------------------------------------
-# Randomize & Reset buttons (placed before Predict)
+# Randomize & Reset buttons (update session_state BEFORE drawing widgets)
 # -----------------------------------------------------------------------------
 btn_col1, btn_col2 = st.columns(2)
 
@@ -189,6 +150,50 @@ if btn_col2.button("🔄 Reset Inputs"):
         options = cat_values[col]
         default_value = "No" if "No" in options else options[0]
         st.session_state[col] = default_value
+
+# -----------------------------------------------------------------------------
+# Input Form
+# -----------------------------------------------------------------------------
+st.header("Input Weather Data")
+
+col_left, col_right = st.columns(2)
+
+numeric_inputs = {}
+for i, col in enumerate(NUM):
+    min_val, max_val, _ = num_stats[col]
+    step = (max_val - min_val) / 100 if max_val > min_val else 0.1
+
+    with (col_left if i % 2 == 0 else col_right):
+        numeric_inputs[col] = st.slider(
+            label=col,
+            min_value=min_val,
+            max_value=max_val,
+            value=st.session_state[col],
+            step=step,
+            key=f"slider_{col}",  # widget key (separate from logical state key)
+        )
+
+categorical_inputs = {}
+for i, col in enumerate(CAT):
+    options = [str(o) for o in cat_values[col]]
+
+    current_value = str(st.session_state[col])
+    # Fallback if current_value unexpectedly missing
+    index = options.index(current_value) if current_value in options else 0
+
+    with (col_left if i % 2 == 0 else col_right):
+        categorical_inputs[col] = st.selectbox(
+            label=col,
+            options=options,
+            index=index,
+            key=f"select_{col}",
+        )
+
+# Keep logical values in session_state in sync with UI widgets
+for col in NUM:
+    st.session_state[col] = float(numeric_inputs[col])
+for col in CAT:
+    st.session_state[col] = str(categorical_inputs[col])
 
 # -----------------------------------------------------------------------------
 # Preprocessing function (numeric imputation → scaling → OHE)
