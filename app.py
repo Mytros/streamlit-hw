@@ -3,10 +3,14 @@ import pandas as pd
 import numpy as np
 import joblib
 
+# -----------------------------------------------------------------------------
 # Streamlit page configuration
+# -----------------------------------------------------------------------------
 st.set_page_config(page_title="Aussie Rain Predictor", page_icon="🌦️")
 
+# -----------------------------------------------------------------------------
 # Load trained model bundle (model, imputer, scaler, encoder, feature lists)
+# -----------------------------------------------------------------------------
 @st.cache_resource
 def load_bundle(path: str = "models/aussie_rain.joblib"):
     """
@@ -41,7 +45,9 @@ encoder = bundle["encoder"]      # OneHotEncoder
 NUM     = list(bundle["numeric_cols"])
 CAT     = list(bundle["categorical_cols"])
 
+# -----------------------------------------------------------------------------
 # Load dataset to extract min/max for numeric sliders and categories for selects
+# -----------------------------------------------------------------------------
 @st.cache_data
 def load_data(path: str = "data/weatherAUS.csv"):
     return pd.read_csv(path)
@@ -69,9 +75,11 @@ cat_values = {
     for col in CAT
 }
 
-
+# -----------------------------------------------------------------------------
 # Title / description
+# -----------------------------------------------------------------------------
 st.title("🌦️ Aussie Rain Predictor")
+
 st.caption(
     "This application predicts whether it will rain tomorrow in Australia "
     "based on daily weather observations from the Australian Bureau of Meteorology."
@@ -99,8 +107,9 @@ with st.expander("📘 Feature Description (What Each Parameter Means)"):
 _All features come from the official WeatherAUS dataset._
     """)
 
-
-# Randomization & Reset logic using Streamlit session_state
+# -----------------------------------------------------------------------------
+# Initialize session_state for inputs
+# -----------------------------------------------------------------------------
 if "inputs_initialized" not in st.session_state:
     st.session_state.inputs_initialized = True
 
@@ -109,38 +118,15 @@ if "inputs_initialized" not in st.session_state:
         _, _, med = num_stats[col]
         st.session_state[col] = float(med)
 
-    # Initialize categorical with default values 
+    # Initialize categorical with default values ("No" if present, else first)
     for col in CAT:
         options = cat_values[col]
         default_value = "No" if "No" in options else options[0]
         st.session_state[col] = default_value
 
-# Buttons row
-btn_col1, btn_col2 = st.columns(2)
-
-# Randomize Inputs
-if btn_col1.button("🎲 Randomize Inputs"):
-    # Random numeric within min–max
-    for col in NUM:
-        mn, mx, _ = num_stats[col]
-        st.session_state[col] = float(np.random.uniform(mn, mx))
-    # Random categorical from known values
-    for col in CAT:
-        st.session_state[col] = str(np.random.choice(cat_values[col]))
-
-# Reset Inputs
-if btn_col2.button("🔄 Reset Inputs"):
-    # Reset numeric to medians
-    for col in NUM:
-        _, _, med = num_stats[col]
-        st.session_state[col] = float(med)
-    # Reset categorical to default
-    for col in CAT:
-        options = cat_values[col]
-        default_value = "No" if "No" in options else options[0]
-        st.session_state[col] = default_value
-
+# -----------------------------------------------------------------------------
 # Input Form
+# -----------------------------------------------------------------------------
 st.header("Input Weather Data")
 
 col_left, col_right = st.columns(2)
@@ -176,8 +162,37 @@ for i, col in enumerate(CAT):
             index=index,
             key=col
         )
-        
-# Preprocessing function (numeric imputation - scaling - OHE)
+
+# -----------------------------------------------------------------------------
+# Randomize & Reset buttons (placed before Predict)
+# -----------------------------------------------------------------------------
+btn_col1, btn_col2 = st.columns(2)
+
+# Randomize Inputs
+if btn_col1.button("🎲 Randomize Inputs"):
+    # Random numeric within min–max
+    for col in NUM:
+        mn, mx, _ = num_stats[col]
+        st.session_state[col] = float(np.random.uniform(mn, mx))
+    # Random categorical from known values
+    for col in CAT:
+        st.session_state[col] = str(np.random.choice(cat_values[col]))
+
+# Reset Inputs
+if btn_col2.button("🔄 Reset Inputs"):
+    # Reset numeric to medians
+    for col in NUM:
+        _, _, med = num_stats[col]
+        st.session_state[col] = float(med)
+    # Reset categorical to default
+    for col in CAT:
+        options = cat_values[col]
+        default_value = "No" if "No" in options else options[0]
+        st.session_state[col] = default_value
+
+# -----------------------------------------------------------------------------
+# Preprocessing function (numeric imputation → scaling → OHE)
+# -----------------------------------------------------------------------------
 def preprocess_row(df_in: pd.DataFrame) -> np.ndarray:
     """
     Preprocess input row using training-time transformations:
@@ -213,7 +228,9 @@ def preprocess_row(df_in: pd.DataFrame) -> np.ndarray:
     X = np.hstack([df_num_scaled.values, X_cat])
     return X
 
+# -----------------------------------------------------------------------------
 # Predict button
+# -----------------------------------------------------------------------------
 if st.button("🔮 Predict RainTomorrow"):
     # Combine numeric and categorical inputs into one row
     row = {**numeric_inputs, **categorical_inputs}
@@ -233,5 +250,3 @@ if st.button("🔮 Predict RainTomorrow"):
     except Exception as e:
         st.error("Error during preprocessing or model prediction.")
         st.exception(e)
-
-
