@@ -16,18 +16,18 @@ def load_bundle(path="models/aussie_rain.joblib"):
     return b
 
 bundle = load_bundle()
-model = bundle["model"]
-imputer = bundle["imputer"]
-scaler = bundle["scaler"]
+model   = bundle["model"]
+imputer = bundle["imputer"]      # <= імпутер ТІЛЬКИ для числових ознак
+scaler  = bundle["scaler"]
 encoder = bundle["encoder"]
-NUM = list(bundle["numeric_cols"])
-CAT = list(bundle["categorical_cols"])
-INPUT_COLS = list(bundle["input_cols"])
+NUM     = list(bundle["numeric_cols"])
+CAT     = list(bundle["categorical_cols"])
+INPUT_COLS = list(bundle["input_cols"])   # просто для інформації, далі не критично
 
 st.title("🌦️ Чи піде дощ завтра?")
-st.caption("Імпутація → масштабування (NUM) → OHE (CAT) → Logistic/RandomForest")
+st.caption("Імпутація (NUM) → масштабування (NUM) → OHE (CAT) → модель")
 
-# --- Форма вводу (просто і прямолінійно) ---
+# ----- Форма вводу -----
 st.header("Ввід даних")
 c1, c2 = st.columns(2)
 
@@ -54,37 +54,61 @@ with c2:
 st.subheader("Категоріальні")
 Location = st.text_input("Location", value="Sydney")
 WindGustDir = st.text_input("WindGustDir", value="N")
-WindDir9am = st.text_input("WindDir9am", value="N")
-WindDir3pm = st.text_input("WindDir3pm", value="N")
-RainToday = st.selectbox("RainToday", ["No", "Yes"], index=0)
+WindDir9am  = st.text_input("WindDir9am", value="N")
+WindDir3pm  = st.text_input("WindDir3pm", value="N")
+RainToday   = st.selectbox("RainToday", ["No", "Yes"], index=0)
 
-def preprocess_row(df: pd.DataFrame) -> pd.DataFrame:
-    """Імпутація (на всіх INPUT_COLS) → масштабування NUM → OHE CAT → конкат."""
-    # 1) впорядкуємо колонки як у train
-    df = df.reindex(columns=INPUT_COLS)
-    # 2) імпутація (твій SimpleImputer був натренований на весь вхід разом)
-    df_imp = pd.DataFrame(imputer.transform(df), columns=INPUT_COLS)
-    # 3) масштабування лише числових
-    X_num = pd.DataFrame(scaler.transform(df_imp[NUM]), columns=NUM)
-    # 4) OHE для категоріальних
-    X_cat = encoder.transform(df_imp[CAT])
+# ----- ВАЖЛИВА ЧАСТИНА: ПРЕПРОЦЕСИНГ -----
+def preprocess_row(df: pd.DataFrame) -> np.ndarray:
+    """
+    1) беремо окремо NUM і CAT;
+    2) імпутуємо ТІЛЬКИ NUM (як було на тренуванні);
+    3) масштабуємо NUM;
+    4) OHE для CAT;
+    5) конкатенуємо в одну матрицю X.
+    """
+    # 1. розділяємо
+    df_num = df[NUM]
+    df_cat = df[CAT]
+
+    # 2. імпутація числових
+    df_num_imp = pd.DataFrame(
+        imputer.transform(df_num),
+        columns=NUM,
+        index=df.index,
+    )
+
+    # 3. масштабування числових
+    df_num_scaled = pd.DataFrame(
+        scaler.transform(df_num_imp),
+        columns=NUM,
+        index=df.index,
+    )
+
+    # 4. OHE для категоріальних
+    X_cat = encoder.transform(df_cat)
     if hasattr(X_cat, "toarray"):
         X_cat = X_cat.toarray()
-    # 5) збірка фінального X
-    X = np.hstack([X_num.values, X_cat])
+
+    # 5. збірка кінцевого X
+    X = np.hstack([df_num_scaled.values, X_cat])
     return X
 
+# ----- Кнопка прогнозу -----
 if st.button("🔮 Прогнозувати"):
     row = {
-        "MinTemp": MinTemp, "MaxTemp": MaxTemp, "Rainfall": Rainfall, "Evaporation": Evaporation, "Sunshine": Sunshine,
-        "WindGustSpeed": WindGustSpeed, "WindSpeed9am": WindSpeed9am, "WindSpeed3pm": WindSpeed3pm,
-        "Humidity9am": Humidity9am, "Humidity3pm": Humidity3pm,
-        "Pressure9am": Pressure9am, "Pressure3pm": Pressure3pm,
-        "Cloud9am": Cloud9am, "Cloud3pm": Cloud3pm,
-        "Temp9am": Temp9am, "Temp3pm": Temp3pm,
-        "Location": Location, "WindGustDir": WindGustDir, "WindDir9am": WindDir9am, "WindDir3pm": WindDir3pm,
+        "MinTemp": MinTemp, "MaxTemp": MaxTemp, "Rainfall": Rainfall,
+        "Evaporation": Evaporation, "Sunshine": Sunshine,
+        "WindGustSpeed": WindGustSpeed, "WindSpeed9am": WindSpeed9am,
+        "WindSpeed3pm": WindSpeed3pm, "Humidity9am": Humidity9am,
+        "Humidity3pm": Humidity3pm, "Pressure9am": Pressure9am,
+        "Pressure3pm": Pressure3pm, "Cloud9am": Cloud9am,
+        "Cloud3pm": Cloud3pm, "Temp9am": Temp9am, "Temp3pm": Temp3pm,
+        "Location": Location, "WindGustDir": WindGustDir,
+        "WindDir9am": WindDir9am, "WindDir3pm": WindDir3pm,
         "RainToday": RainToday
     }
+
     X_in = pd.DataFrame([row])
 
     try:
