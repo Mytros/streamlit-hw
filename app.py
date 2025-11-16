@@ -69,7 +69,6 @@ cat_values = {
     for col in CAT
 }
 
-
 # Title / description
 st.title("🌦️ Aussie Rain Predictor")
 st.caption(
@@ -96,12 +95,28 @@ with st.expander("Feature Description"):
 - **WindDir9am / WindDir3pm** — Wind direction at 9am / 3pm.
 - **RainToday** — Whether it rained today ("Yes" / "No").
 
+**Wind Direction Codes**
+- **N** — North  
+- **NNE** — North–North–East  
+- **NE** — North–East  
+- **ENE** — East–North–East  
+- **E** — East  
+- **ESE** — East–South–East  
+- **SE** — South–East  
+- **SSE** — South–South–East  
+- **S** — South  
+- **SSW** — South–South–West  
+- **SW** — South–West  
+- **WSW** — West–South–West  
+- **W** — West  
+- **WNW** — West–North–West  
+- **NW** — North–West  
+- **NNW** — North–North–West  
+
 _All features come from the official WeatherAUS dataset._
     """)
 
-
-
-# Randomization & Reset logic using Streamlit session_state
+# Randomization & Reset logic
 if "inputs_initialized" not in st.session_state:
     st.session_state.inputs_initialized = True
 
@@ -237,3 +252,4 @@ if st.button("🔮 Predict RainTomorrow"):
     except Exception as e:
         st.error("Error during preprocessing or model prediction.")
         st.exception(e)
+
