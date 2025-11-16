@@ -3,14 +3,10 @@ import pandas as pd
 import numpy as np
 import joblib
 
-# -----------------------------------------------------------------------------
 # Streamlit page configuration
-# -----------------------------------------------------------------------------
 st.set_page_config(page_title="Aussie Rain Predictor", page_icon="🌦️")
 
-# -----------------------------------------------------------------------------
 # Load trained model bundle (model, imputer, scaler, encoder, feature lists)
-# -----------------------------------------------------------------------------
 @st.cache_resource
 def load_bundle(path: str = "models/aussie_rain.joblib"):
     """
@@ -45,9 +41,7 @@ encoder = bundle["encoder"]      # OneHotEncoder
 NUM     = list(bundle["numeric_cols"])
 CAT     = list(bundle["categorical_cols"])
 
-# -----------------------------------------------------------------------------
 # Load dataset to extract min/max for numeric sliders and categories for selects
-# -----------------------------------------------------------------------------
 @st.cache_data
 def load_data(path: str = "data/weatherAUS.csv"):
     return pd.read_csv(path)
@@ -75,17 +69,15 @@ cat_values = {
     for col in CAT
 }
 
-# -----------------------------------------------------------------------------
-# Title / description
-# -----------------------------------------------------------------------------
-st.title("🌦️ Aussie Rain Predictor")
 
+# Title / description
+st.title("🌦️ Aussie Rain Predictor")
 st.caption(
     "This application predicts whether it will rain tomorrow in Australia "
     "based on daily weather observations from the Australian Bureau of Meteorology."
 )
 
-with st.expander("📘 Feature Description (What Each Parameter Means)"):
+with st.expander("Feature Description"):
     st.markdown("""
 **Numeric Features**
 - **MinTemp / MaxTemp** — Minimum and maximum temperature of the day (°C).
@@ -107,9 +99,9 @@ with st.expander("📘 Feature Description (What Each Parameter Means)"):
 _All features come from the official WeatherAUS dataset._
     """)
 
-# -----------------------------------------------------------------------------
-# Initialize session_state for inputs (only once)
-# -----------------------------------------------------------------------------
+
+
+# Randomization & Reset logic using Streamlit session_state
 if "inputs_initialized" not in st.session_state:
     st.session_state.inputs_initialized = True
 
@@ -118,55 +110,13 @@ if "inputs_initialized" not in st.session_state:
         _, _, med = num_stats[col]
         st.session_state[col] = float(med)
 
-    # Initialize categorical with default values ("No" if present, else first)
+    # Initialize categorical with default values 
     for col in CAT:
         options = cat_values[col]
         default_value = "No" if "No" in options else options[0]
-        st.session_state[col] = str(default_value)
+        st.session_state[col] = default_value
 
-# -----------------------------------------------------------------------------
-# Input Form (reads from session_state)
-# -----------------------------------------------------------------------------
-st.header("Input Weather Data")
-
-col_left, col_right = st.columns(2)
-
-numeric_inputs = {}
-for i, col in enumerate(NUM):
-    min_val, max_val, _ = num_stats[col]
-    step = (max_val - min_val) / 100 if max_val > min_val else 0.1
-
-    with (col_left if i % 2 == 0 else col_right):
-        numeric_inputs[col] = st.slider(
-            label=col,
-            min_value=min_val,
-            max_value=max_val,
-            value=st.session_state[col],
-            step=step,
-            key=col  # widget key == state key
-        )
-
-categorical_inputs = {}
-for i, col in enumerate(CAT):
-    options = [str(o) for o in cat_values[col]]
-
-    current_value = str(st.session_state[col])
-    if current_value not in options:
-        current_value = options[0]
-
-    with (col_left if i % 2 == 0 else col_right):
-        categorical_inputs[col] = st.selectbox(
-            label=col,
-            options=options,
-            index=options.index(current_value),
-            key=col  # widget key == state key
-        )
-
-# (Widgets automatically keep st.session_state[col] updated.)
-
-# -----------------------------------------------------------------------------
-# Randomize & Reset buttons (update session_state; widgets will follow)
-# -----------------------------------------------------------------------------
+# Buttons row
 btn_col1, btn_col2 = st.columns(2)
 
 # Randomize Inputs
@@ -189,14 +139,48 @@ if btn_col2.button("🔄 Reset Inputs"):
     for col in CAT:
         options = cat_values[col]
         default_value = "No" if "No" in options else options[0]
-        st.session_state[col] = str(default_value)
+        st.session_state[col] = default_value
 
-# After changing session_state, Streamlit reruns the script.
-# On rerun, sliders/selectboxes will show updated session_state values.
 
-# -----------------------------------------------------------------------------
-# Preprocessing function (numeric imputation → scaling → OHE)
-# -----------------------------------------------------------------------------
+# Input Form
+
+st.header("Input Weather Data")
+
+col_left, col_right = st.columns(2)
+
+numeric_inputs = {}
+for i, col in enumerate(NUM):
+    min_val, max_val, _ = num_stats[col]
+    step = (max_val - min_val) / 100 if max_val > min_val else 0.1
+
+    with (col_left if i % 2 == 0 else col_right):
+        numeric_inputs[col] = st.slider(
+            label=col,
+            min_value=min_val,
+            max_value=max_val,
+            value=st.session_state[col],
+            step=step,
+            key=col  # each feature uses its own key in session_state
+        )
+
+categorical_inputs = {}
+for i, col in enumerate(CAT):
+    options = [str(o) for o in cat_values[col]]
+
+    # Current value stored in session_state[col]
+    current_value = str(st.session_state[col])
+    # Fallback in case current_value is not found in options
+    index = options.index(current_value) if current_value in options else 0
+
+    with (col_left if i % 2 == 0 else col_right):
+        categorical_inputs[col] = st.selectbox(
+            label=col,
+            options=options,
+            index=index,
+            key=col
+        )
+
+# Preprocessing function (numeric imputation - scaling - OHE)
 def preprocess_row(df_in: pd.DataFrame) -> np.ndarray:
     """
     Preprocess input row using training-time transformations:
@@ -223,7 +207,7 @@ def preprocess_row(df_in: pd.DataFrame) -> np.ndarray:
         index=df_in.index
     )
 
-    # One-hot encode categorical columns
+    # OHE categorical columns
     X_cat = encoder.transform(df_cat)
     if hasattr(X_cat, "toarray"):
         X_cat = X_cat.toarray()  # convert sparse to dense if needed
@@ -232,9 +216,8 @@ def preprocess_row(df_in: pd.DataFrame) -> np.ndarray:
     X = np.hstack([df_num_scaled.values, X_cat])
     return X
 
-# -----------------------------------------------------------------------------
+
 # Predict button
-# -----------------------------------------------------------------------------
 if st.button("🔮 Predict RainTomorrow"):
     # Combine numeric and categorical inputs into one row
     row = {**numeric_inputs, **categorical_inputs}
@@ -243,7 +226,7 @@ if st.button("🔮 Predict RainTomorrow"):
     try:
         X_ready = preprocess_row(X_in)
         prob = float(model.predict_proba(X_ready)[0, 1])
-        pred = "Yes" if prob >= 0.5 else "No"
+        pred = "Yes" if prob >= 0.5 else "No" # threshold = 0.5
 
         st.success(f"RainTomorrow prediction: **{pred}**")
         st.metric("Rain probability", f"{prob * 100:.1f}%")
